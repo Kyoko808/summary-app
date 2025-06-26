@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL要約アプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>URL要約アプリ</h1>
+        <div class="input-section">
+            <input type="text" id="urlInput" placeholder="要約したいURLを入力してください">
+            <button id="summarizeButton">要約する</button>
+        </div>
+        <div class="output-section">
+            <h2>要約結果</h2>
+            <pre id="summaryOutput">ここに要約結果が表示されます。</pre>
+        </div>
+        <div id="loading" class="hidden">要約中...</div>
+        <div id="error" class="hidden error-message"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

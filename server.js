@@ -6,7 +6,7 @@ const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Gemini APIキーの取得
 const API_KEY = process.env.GEMINI_API_KEY;

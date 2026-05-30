@@ -58,7 +58,7 @@ app.post('/summarize', async (req, res) => {
         const textToSummarize = content.length > MAX_CONTENT_LENGTH ? content.substring(0, MAX_CONTENT_LENGTH) + '...' : content;
 
         // 2. Gemini APIで要約
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
         const prompt = `以下の日本語のテキストを1行で要約してください。\n\n${textToSummarize}`;
 
         const result = await model.generateContent(prompt);

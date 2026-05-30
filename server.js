@@ -70,11 +70,8 @@ app.post('/summarize', async (req, res) => {
     } catch (error) {
         console.error('要約処理中にエラーが発生しました:', error.message || error);
         
-        if (error.message && (error.message.includes('blocked') || error.message.includes('API_KEY_INVALID') || error.message.includes('403') || error.message.includes('404'))) {
-            return res.status(500).json({ error: 'Gemini APIキーが無効、またはブロックされています。新しいAPIキーを設定してください。' });
-        }
-        
-        res.status(500).json({ error: 'サーバーエラーが発生しました。' });
+        // デバッグ用に実際のエラーメッセージをクライアントに返す
+        res.status(500).json({ error: `サーバーエラーが発生しました。詳細: ${error.message || error}` });
     }
 });
 

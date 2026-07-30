@@ -22,25 +22,47 @@ app.use(express.static('./')); // 静的ファイル（index.html, style.css, sc
 
 // URLから本文を抽出する関数
 async function extractMainContent(url) {
-    try {
-        const response = await fetch(url, {
-            timeout: 15000, // 15秒タイムアウト (node-fetch v2標準のオプション)
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const html = await response.text();
-        const dom = new JSDOM(html, { url: url });
-        const reader = new Readability(dom.window.document);
-        const article = reader.parse();
-        return article ? article.textContent : null;
-    } catch (error) {
-        console.error('コンテンツの抽出中にエラーが発生しました:', error.message || error);
-        return null;
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl;
     }
+
+    const response = await fetch(targetUrl, {
+        timeout: 15000,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Webサイトへのアクセスに失敗しました (HTTP ${response.status})`);
+    }
+
+    const html = await response.text();
+    const dom = new JSDOM(html, { url: targetUrl });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+
+    let textContent = article ? article.textContent : null;
+
+    // Readabilityで抽出できなかった場合、DOMのbodyから直接テキストを抽出（フォールバック）
+    if (!textContent || textContent.trim().length === 0) {
+        const body = dom.window.document.querySelector('body');
+        if (body) {
+            const clone = body.cloneNode(true);
+            const scriptsAndStyles = clone.querySelectorAll('script, style, noscript, header, footer, nav');
+            scriptsAndStyles.forEach(node => node.remove());
+            textContent = clone.textContent;
+        }
+    }
+
+    if (!textContent || textContent.trim().length === 0) {
+        throw new Error('Webサイトから本文テキストを認識・抽出できませんでした');
+    }
+
+    return textContent.trim();
 }
 
 // 要約エンドポイント
@@ -54,12 +76,9 @@ app.post('/summarize', async (req, res) => {
     try {
         // 1. URLから本文を抽出
         const content = await extractMainContent(url);
-        if (!content) {
-            return res.status(400).json({ error: '指定されたURLから本文を抽出できませんでした。' });
-        }
 
         // 抽出したコンテンツが長すぎる場合、最初の数文字に制限する（APIのトークン制限対策）
-        const MAX_CONTENT_LENGTH = 10000; // 例: 10000文字に制限
+        const MAX_CONTENT_LENGTH = 10000;
         const textToSummarize = content.length > MAX_CONTENT_LENGTH ? content.substring(0, MAX_CONTENT_LENGTH) + '...' : content;
 
         // 2. Gemini APIで要約
@@ -74,9 +93,7 @@ app.post('/summarize', async (req, res) => {
 
     } catch (error) {
         console.error('要約処理中にエラーが発生しました:', error.message || error);
-        
-        // デバッグ用に実際のエラーメッセージをクライアントに返す
-        res.status(500).json({ error: `サーバーエラーが発生しました。詳細: ${error.message || error}` });
+        res.status(500).json({ error: `処理に失敗しました。詳細: ${error.message || error}` });
     }
 });
 

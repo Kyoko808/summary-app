@@ -65,6 +65,34 @@ async function extractMainContent(url) {
     return textContent.trim();
 }
 
+// Gemini APIの呼び出し（503混雑時の自動リトライ＆フォールバック付き）
+async function generateSummaryWithRetry(prompt, retries = 3, delayMs = 1500) {
+    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                return response.text();
+            } catch (error) {
+                lastError = error;
+                const isRetryable = error.message && (error.message.includes('503') || error.message.includes('429') || error.message.includes('high demand') || error.message.includes('Unavailable'));
+                
+                if (isRetryable && attempt < retries) {
+                    console.log(`[Gemini API] ${modelName} の混雑を検出。${delayMs}ms後に再試行します (${attempt}/${retries})...`);
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                } else {
+                    break; // このモデルでのリトライを終え、次のモデルへ切り替え
+                }
+            }
+        }
+    }
+    throw lastError;
+}
+
 // 要約エンドポイント
 app.post('/summarize', async (req, res) => {
     const { url } = req.body;
@@ -81,13 +109,9 @@ app.post('/summarize', async (req, res) => {
         const MAX_CONTENT_LENGTH = 10000;
         const textToSummarize = content.length > MAX_CONTENT_LENGTH ? content.substring(0, MAX_CONTENT_LENGTH) + '...' : content;
 
-        // 2. Gemini APIで要約
-        const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+        // 2. Gemini APIで要約（自動リトライ＆フォールバック機能付き）
         const prompt = `以下の日本語のテキストを1行で要約してください。\n\n${textToSummarize}`;
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const summary = response.text();
+        const summary = await generateSummaryWithRetry(prompt);
 
         res.json({ summary: summary });
 

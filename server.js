@@ -22,8 +22,16 @@ app.use(express.static('./')); // 静的ファイル（index.html, style.css, sc
 
 // URLから本文を抽出する関数
 async function extractMainContent(url) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10秒でタイムアウト
+
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -33,8 +41,10 @@ async function extractMainContent(url) {
         const article = reader.parse();
         return article ? article.textContent : null;
     } catch (error) {
-        console.error('コンテンツの抽出中にエラーが発生しました:', error);
+        console.error('コンテンツの抽出中にエラーが発生しました:', error.message || error);
         return null;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 

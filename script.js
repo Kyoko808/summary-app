@@ -33,12 +33,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: controller.signal,
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || '要約に失敗しました。');
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                if (!response.ok) {
+                    throw new Error(`サーバーからエラーが返されました (HTTP ${response.status})。Renderのデプロイ中または再起動中の可能性があります。数秒待ってから再度お試しください。`);
+                }
+                throw new Error('サーバーから予期しない形式のレスポンスが返されました。');
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || '要約に失敗しました。');
+            }
+
             summaryOutput.textContent = data.summary;
 
         } catch (error) {
